@@ -10,11 +10,18 @@ import type {
   Prestamo,
 } from "@/types";
 import {
-  aplicarAbono,
   construirPlanCuotasFijas,
   construirPlanCuotasManual,
   construirPrimeraCuotaInteres,
 } from "@/lib/calculations";
+import { type InputRegistroAbono } from "@/lib/registrar-abono";
+import {
+  buildRegistrarAbonoRpcParams,
+  extractRpcErrorMessage,
+  generateIdempotencyKey,
+  parseRegistrarAbonoRpcResponse,
+  type RegistrarAbonoRpcResponse,
+} from "@/lib/registrar-abono-rpc";
 import { planDesdeSimulacion, simularCredito } from "@/lib/loan-simulator";
 
 function mapCliente(row: Record<string, unknown>): Cliente {
@@ -246,6 +253,10 @@ function mapPlanCuota(
     capital_cuota,
     fecha_vencimiento: String(row.fecha_vencimiento).slice(0, 10),
     monto_pagado: Number(row.monto_pagado ?? 0),
+    monto_pagado_interes:
+      row.monto_pagado_interes != null ? Number(row.monto_pagado_interes) : undefined,
+    monto_pagado_capital:
+      row.monto_pagado_capital != null ? Number(row.monto_pagado_capital) : undefined,
     estado: row.estado as PlanCuota["estado"],
     tipo_cuota: prestamo
       ? inferirTipoCuota(prestamo, row)
@@ -651,32 +662,25 @@ export async function deletePrestamoDb(id: string): Promise<void> {
 async function syncPlanCuotas(planCuotas: PlanCuota[], prestamo: Prestamo): Promise<void> {
   for (const cuota of planCuotas) {
     if (cuota.id.startsWith("tmp-")) {
-      const inserted = await insertPlanCuotaDb(
-        {
-          prestamo_id: cuota.prestamo_id,
-          numero_cuota: cuota.numero_cuota,
-          monto_cuota: cuota.monto_cuota,
-          fecha_vencimiento: cuota.fecha_vencimiento,
-          monto_pagado: cuota.monto_pagado,
-          estado: cuota.estado,
-          tipo_cuota: cuota.tipo_cuota,
-        },
-        prestamo
+      throw new Error(
+        "No se pueden insertar cuotas temporales durante un abono. " +
+          "La generación automática de cuotas de interés está deshabilitada en este paso."
       );
-      cuota.id = inserted.id;
-    } else {
-      const { error } = await supabase
-        .from("plan_cuotas")
-        .update({
-          monto_cuota: cuota.monto_cuota,
-          monto_pagado: cuota.monto_pagado,
-          estado: cuota.estado,
-          fecha_vencimiento: cuota.fecha_vencimiento,
-        })
-        .eq("id", cuota.id);
-
-      throwIfError(error, "Error al actualizar cuota del plan");
     }
+
+    const payload: Record<string, unknown> = {
+      monto_cuota: cuota.monto_cuota,
+      monto_pagado: cuota.monto_pagado,
+      estado: cuota.estado,
+      fecha_vencimiento: cuota.fecha_vencimiento,
+    };
+
+    const { error } = await supabase
+      .from("plan_cuotas")
+      .update(payload)
+      .eq("id", cuota.id);
+
+    throwIfError(error, "Error al actualizar cuota del plan");
   }
 }
 
@@ -684,74 +688,39 @@ export async function registrarAbonoDb(
   prestamo: Prestamo,
   planCuotas: PlanCuota[],
   abonos: Abono[],
-  input: NuevoAbonoInput & {
-    metodo_pago?: string;
-    aplicacion_abono?: AplicacionAbono;
-  }
+  input: InputRegistroAbono
 ): Promise<{
   prestamoActualizado: Prestamo;
   planCuotasActualizado: PlanCuota[];
   abono: Abono;
 }> {
-  const planDelPrestamo = planCuotas.filter((c) => c.prestamo_id === prestamo.id);
+  void abonos;
 
-  const resultado = aplicarAbono(prestamo, planDelPrestamo, {
-    monto_abonado: input.monto_abonado,
-    fecha_abono: input.fecha_abono,
-    notas: input.notas,
-    tipo_abono: input.tipo_abono,
-    plan_cuota_id: input.plan_cuota_id,
-  });
+  const idempotencyKey = input.idempotency_key ?? generateIdempotencyKey();
+  const rpcParams = buildRegistrarAbonoRpcParams(input, idempotencyKey);
 
-  await syncPlanCuotas(resultado.planCuotasActualizado, prestamo);
+  const { data, error } = await supabase.rpc("registrar_abono", rpcParams);
 
-  const abonoInsert = {
-    prestamo_id: input.prestamo_id,
-    monto_abonado: input.monto_abonado,
-    fecha_abono: input.fecha_abono,
-    notas: input.notas,
-    tipo_abono: resultado.abono.tipo_abono,
-    plan_cuota_id: resultado.abono.plan_cuota_id,
-    metodo_pago: input.metodo_pago ?? "",
-    aplicacion_abono: input.aplicacion_abono ?? "interes_y_capital",
-  };
+  if (error) {
+    throw new Error(extractRpcErrorMessage(error));
+  }
 
-  const { data: abonoRow, error: abonoError } = await supabase
-    .from("abonos")
-    .insert(abonoInsert)
-    .select("*")
-    .single();
+  if (!data || typeof data !== "object") {
+    throw new Error("La RPC registrar_abono no devolvió una respuesta válida");
+  }
 
-  throwIfError(abonoError, "Error al registrar abono");
-
-  const saldoCap = resultado.prestamoActualizado.saldo_capital;
-  const deudaPendiente = resultado.planCuotasActualizado.reduce(
-    (s, c) => s + Math.max(0, c.monto_cuota - c.monto_pagado),
-    0
-  );
-
-  const { error: prestamoError } = await supabase
-    .from("prestamos")
-    .update(
-      mapLegacyPrestamoFields({
-        cuotas_pagadas: resultado.prestamoActualizado.cuotas_pagadas,
-        saldo_capital: saldoCap,
-        valor_cuota: resultado.prestamoActualizado.valor_cuota,
-        estado: resultado.prestamoActualizado.estado,
-        deuda_total: deudaPendiente,
-        saldo_interes: Math.max(0, deudaPendiente - saldoCap),
-      })
-    )
-    .eq("id", prestamo.id);
-
-  throwIfError(prestamoError, "Error al actualizar préstamo tras abono");
+  const rpcResponse = data as RegistrarAbonoRpcResponse;
+  if (
+    rpcResponse.ok !== true &&
+    !(rpcResponse.abono && typeof rpcResponse.abono === "object" && rpcResponse.abono.id)
+  ) {
+    const detail =
+      typeof (data as { error?: string }).error === "string"
+        ? (data as { error: string }).error
+        : JSON.stringify(data);
+    throw new Error(`No se pudo registrar el abono: ${detail}`);
+  }
 
   const otrosPlanes = planCuotas.filter((c) => c.prestamo_id !== prestamo.id);
-  const planFinal = [...otrosPlanes, ...resultado.planCuotasActualizado];
-
-  return {
-    prestamoActualizado: resultado.prestamoActualizado,
-    planCuotasActualizado: planFinal,
-    abono: mapAbono(abonoRow),
-  };
+  return parseRegistrarAbonoRpcResponse(rpcResponse, prestamo, otrosPlanes);
 }

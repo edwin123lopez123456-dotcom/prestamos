@@ -127,8 +127,8 @@ export function AbonoModal({ prestamo, onAbono, disabled }: AbonoModalProps) {
       });
 
       setPaso("recibo");
-    } catch {
-      alert("No se pudo registrar el abono.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No se pudo registrar el abono.");
     } finally {
       setGuardando(false);
     }

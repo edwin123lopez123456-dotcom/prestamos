@@ -41,6 +41,9 @@ export interface PlanCuota {
   capital_cuota: number;
   fecha_vencimiento: string;
   monto_pagado: number;
+  /** Desglose en memoria (opcional). Si falta, se infiere asumiendo prioridad interés→capital */
+  monto_pagado_interes?: number;
+  monto_pagado_capital?: number;
   estado: EstadoPlanCuota;
   tipo_cuota: TipoCuota;
 }

@@ -293,7 +293,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const registrarAbono = useCallback(
     async (prestamoId: string, input: NuevoAbonoInput) => {
       const prestamo = prestamos.find((p) => p.id === prestamoId);
-      if (!prestamo) return;
+      if (!prestamo) {
+        throw new Error("El préstamo no existe");
+      }
 
       await runMutation(async () => {
         const { prestamoActualizado, planCuotasActualizado, abono } =

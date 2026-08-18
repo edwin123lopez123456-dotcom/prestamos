@@ -153,8 +153,8 @@ export function AbonoAvanzadoForm({ clienteId, prestamoId }: AbonoAvanzadoFormPr
       await registrarAbonoAvanzado(prestamoId, input);
       setUltimoAbono({ monto: valorPagar, nuevoSaldo });
       setMostrarRecibo(true);
-    } catch {
-      alert("No se pudo registrar el abono");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No se pudo registrar el abono");
     }
   }
 
