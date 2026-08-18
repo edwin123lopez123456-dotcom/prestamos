@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { Cliente, PrestamoConCliente } from "@/types";
-import { formatEstado, formatFrecuencia } from "@/lib/utils";
+import type { MetricasDashboard } from "@/types";
+import { formatEstado, formatFrecuencia, formatTipoPrestamo } from "@/lib/utils";
 
 /** Descarga un workbook como archivo .xlsx */
 function descargarWorkbook(wb: XLSX.WorkBook, nombreArchivo: string) {
@@ -28,11 +29,14 @@ export function exportarPrestamosExcel(prestamos: PrestamoConCliente[]) {
     id: p.id,
     cliente: p.cliente.nombre,
     telefono: p.cliente.telefono,
+    tipo: formatTipoPrestamo(p.tipo_prestamo),
     monto_prestado: p.monto_prestado,
+    saldo_capital: p.saldo_capital,
     frecuencia: formatFrecuencia(p.frecuencia),
-    valor_cuota: p.valor_cuota,
-    total_cuotas: p.total_cuotas,
+    tasa_interes: p.tasa_interes ?? "",
+    proxima_cuota: p.proxima_cuota?.monto_cuota ?? "",
     cuotas_pagadas: p.cuotas_pagadas,
+    total_cuotas: p.plan_cuotas.length || p.total_cuotas || "",
     saldo_pendiente: p.saldo_pendiente,
     estado: formatEstado(p.estado),
     mora_dias: p.mora.dias_atraso,
@@ -92,10 +96,43 @@ export async function importarClientesExcel(
       telefono,
       descripcion,
       fecha_registro: mapa["fecha_registro"] || mapa["fecha"] || hoy,
+      activo: true,
     });
   }
 
   return clientes;
+}
+
+/** Reporte financiero general para el resumen */
+export function exportarReporteFinancieroExcel(
+  metricas: MetricasDashboard,
+  prestamos: PrestamoConCliente[]
+) {
+  const resumen = [
+    { indicador: "Dinero en la calle", valor: metricas.dinero_en_calle },
+    { indicador: "Recaudado hoy", valor: metricas.total_recaudado_hoy },
+    { indicador: "Clientes en mora", valor: metricas.clientes_en_mora },
+    { indicador: "Próximos cobros", valor: metricas.proximos_cobros },
+    { indicador: "Intereses ganados", valor: metricas.intereses_ganados },
+    { indicador: "Intereses por cobrar", valor: metricas.intereses_por_cobrar },
+  ];
+
+  const cartera = prestamos
+    .filter((p) => p.estado !== "pagado")
+    .map((p) => ({
+      cliente: p.cliente.nombre,
+      telefono: p.cliente.telefono,
+      tipo: formatTipoPrestamo(p.tipo_prestamo),
+      saldo_pendiente: p.saldo_pendiente,
+      cuota: p.proxima_cuota?.monto_cuota ?? p.valor_cuota ?? "",
+      mora_dias: p.mora.dias_atraso,
+      estado: formatEstado(p.estado),
+    }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), "Resumen");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cartera), "Cartera activa");
+  descargarWorkbook(wb, `reporte_financiero_${fechaArchivo()}.xlsx`);
 }
 
 /** Descarga recibo como PDF usando html2canvas + jspdf */

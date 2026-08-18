@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Préstamos E-I | Gestión de Cartera",
+  title: "Préstamos E-I | CobrApp",
   description:
-    "Software de gestión de préstamos para prestamistas independientes. Dashboard, clientes, préstamos y abonos.",
+    "Gestión de microcréditos. Dashboard, clientes y créditos.",
 };
 
 export default function RootLayout({

@@ -4,18 +4,23 @@ import type {
   Cliente,
   DatoGrafico,
   MoraCliente,
+  PlanCuota,
   Prestamo,
   PrestamoConCliente,
 } from "@/types";
-import { calcularMora } from "@/lib/calculations";
+import {
+  calcularMora,
+  calcularSaldoPendiente,
+  cuotaPendienteMasAntigua,
+} from "@/lib/calculations";
 
 const DIAS_SEMANA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-/** Enriquece préstamos con datos del cliente, saldo y mora */
 export function enriquecerPrestamos(
   prestamos: Prestamo[],
   clientes: Cliente[],
-  abonos: Abono[]
+  abonos: Abono[],
+  planCuotas: PlanCuota[]
 ): PrestamoConCliente[] {
   return prestamos
     .map((prestamo) => {
@@ -23,10 +28,21 @@ export function enriquecerPrestamos(
       if (!cliente) return null;
 
       const abonosPrestamo = abonos.filter((a) => a.prestamo_id === prestamo.id);
-      const total_abonado = abonosPrestamo.reduce((sum, a) => sum + a.monto_abonado, 0);
-      const totalEsperado = prestamo.valor_cuota * prestamo.total_cuotas;
-      const saldo_pendiente = Math.max(0, totalEsperado - total_abonado);
-      const mora = calcularMora(prestamo);
+      const planDelPrestamo = planCuotas
+        .filter((c) => c.prestamo_id === prestamo.id)
+        .sort((a, b) => a.numero_cuota - b.numero_cuota);
+
+      const total_abonado = abonosPrestamo.reduce(
+        (sum, a) => sum + a.monto_abonado,
+        0
+      );
+      const saldo_pendiente = calcularSaldoPendiente(prestamo, planDelPrestamo);
+      const mora = calcularMora(prestamo, planDelPrestamo);
+      const proxima_cuota = cuotaPendienteMasAntigua(planDelPrestamo);
+      const interes_periodo =
+        prestamo.tipo_prestamo === "solo_interes"
+          ? prestamo.valor_cuota
+          : null;
 
       return {
         ...prestamo,
@@ -34,17 +50,25 @@ export function enriquecerPrestamos(
         total_abonado,
         saldo_pendiente,
         mora,
+        plan_cuotas: planDelPrestamo,
+        proxima_cuota,
+        interes_periodo,
       };
     })
     .filter((p): p is PrestamoConCliente => p !== null);
 }
 
-/** Genera alertas rápidas a partir de préstamos enriquecidos */
 export function generarAlertas(prestamos: PrestamoConCliente[]): AlertaRapida[] {
   const alertas: AlertaRapida[] = [];
 
   for (const p of prestamos) {
     if (p.estado === "pagado") continue;
+
+    const montoCuota =
+      p.proxima_cuota?.monto_cuota ??
+      p.valor_cuota ??
+      p.interes_periodo ??
+      0;
 
     if (p.mora.dias_atraso > 0) {
       alertas.push({
@@ -52,9 +76,10 @@ export function generarAlertas(prestamos: PrestamoConCliente[]): AlertaRapida[] 
         tipo: "atrasado",
         cliente_nombre: p.cliente.nombre,
         prestamo_id: p.id,
-        monto_cuota: p.valor_cuota,
+        monto_cuota: montoCuota,
         dias_retraso: p.mora.dias_atraso,
         semaforo: p.mora.semaforo,
+        tipo_prestamo: p.tipo_prestamo,
       });
     } else {
       alertas.push({
@@ -62,9 +87,10 @@ export function generarAlertas(prestamos: PrestamoConCliente[]): AlertaRapida[] 
         tipo: "proximo",
         cliente_nombre: p.cliente.nombre,
         prestamo_id: p.id,
-        monto_cuota: p.valor_cuota,
+        monto_cuota: montoCuota,
         fecha_cobro: p.mora.fecha_proxima_cuota,
         semaforo: "verde",
+        tipo_prestamo: p.tipo_prestamo,
       });
     }
   }
@@ -75,7 +101,6 @@ export function generarAlertas(prestamos: PrestamoConCliente[]): AlertaRapida[] 
   });
 }
 
-/** Agrega la peor mora de cada cliente */
 export function agregarMoraPorCliente(
   prestamos: PrestamoConCliente[]
 ): Map<string, MoraCliente> {
@@ -103,7 +128,6 @@ export function agregarMoraPorCliente(
   return map;
 }
 
-/** Gráfico semanal calculado desde abonos y préstamos reales */
 export function generarDatosGrafico(
   abonos: Abono[],
   prestamos: Prestamo[]

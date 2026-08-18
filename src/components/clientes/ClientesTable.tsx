@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Upload,
   Download,
@@ -30,6 +31,7 @@ const MORA_AL_DIA: InfoMora = {
 };
 
 export function ClientesTable() {
+  const router = useRouter();
   const { searchQuery } = useAppContext();
   const {
     clientes,
@@ -265,7 +267,8 @@ export function ClientesTable() {
               return (
                 <tr
                   key={cliente.id}
-                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/clientes/${cliente.id}`)}
                 >
                   <td className="px-4 py-3 font-medium text-slate-900">{cliente.nombre}</td>
                   <td className="px-4 py-3 text-slate-600">{cliente.telefono}</td>
@@ -278,7 +281,7 @@ export function ClientesTable() {
                   <td className="px-4 py-3 text-slate-600">
                     {formatDate(cliente.fecha_registro)}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     <AccionesCliente cliente={cliente} />
                   </td>
                 </tr>
@@ -304,11 +307,12 @@ export function ClientesTable() {
               key={cliente.id}
               className={
                 mora.semaforo === "rojo"
-                  ? "border-red-200"
+                  ? "border-red-200 cursor-pointer"
                   : mora.semaforo === "amarillo"
-                    ? "border-amber-200"
-                    : undefined
+                    ? "border-amber-200 cursor-pointer"
+                    : "cursor-pointer"
               }
+              onClick={() => router.push(`/clientes/${cliente.id}`)}
             >
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -329,7 +333,7 @@ export function ClientesTable() {
                     {cliente.id}
                   </Badge>
                 </div>
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
                     variant="outline"

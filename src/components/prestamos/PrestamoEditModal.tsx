@@ -19,22 +19,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { FrecuenciaPago, PrestamoConCliente } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import type { FrecuenciaPago, Prestamo, PrestamoConCliente } from "@/types";
+import { formatCurrency, formatFrecuencia, formatTipoPrestamo } from "@/lib/utils";
 
-const frecuencias: FrecuenciaPago[] = ["diario", "semanal", "quincenal", "mensual"];
+const frecuenciasInteres: FrecuenciaPago[] = ["diario", "semanal", "mensual"];
 
 interface PrestamoEditModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   prestamo: PrestamoConCliente | null;
-  onSave: (data: {
-    monto_prestado: number;
-    frecuencia: FrecuenciaPago;
-    valor_cuota: number;
-    total_cuotas: number;
-    fecha_inicio: string;
-  }) => void;
+  onSave: (data: Partial<Prestamo>) => void;
 }
 
 export function PrestamoEditModal({
@@ -43,42 +37,44 @@ export function PrestamoEditModal({
   prestamo,
   onSave,
 }: PrestamoEditModalProps) {
-  const [monto, setMonto] = useState(0);
-  const [frecuencia, setFrecuencia] = useState<FrecuenciaPago>("semanal");
-  const [valorCuota, setValorCuota] = useState(0);
-  const [totalCuotas, setTotalCuotas] = useState(0);
+  const [valorInteres, setValorInteres] = useState(0);
+  const [frecuencia, setFrecuencia] = useState<FrecuenciaPago>("mensual");
   const [fechaInicio, setFechaInicio] = useState("");
 
   useEffect(() => {
     if (open && prestamo) {
-      setMonto(prestamo.monto_prestado);
+      setValorInteres(prestamo.valor_cuota ?? 0);
       setFrecuencia(prestamo.frecuencia);
-      setValorCuota(prestamo.valor_cuota);
-      setTotalCuotas(prestamo.total_cuotas);
       setFechaInicio(prestamo.fecha_inicio);
     }
   }, [open, prestamo]);
 
   if (!prestamo) return null;
 
-  const totalEsperado = valorCuota * totalCuotas;
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (monto <= 0 || valorCuota <= 0 || totalCuotas <= 0) {
-      alert("Complete todos los campos con valores válidos");
-      return;
+    if (!prestamo) return;
+
+    if (prestamo.tipo_prestamo === "solo_interes") {
+      if (valorInteres <= 0) {
+        alert("Ingrese un valor de interés válido");
+        return;
+      }
+      onSave({
+        valor_cuota: valorInteres,
+        frecuencia,
+        fecha_inicio: fechaInicio,
+      });
+    } else {
+      onSave({ fecha_inicio: fechaInicio });
     }
 
-    onSave({
-      monto_prestado: monto,
-      frecuencia,
-      valor_cuota: valorCuota,
-      total_cuotas: totalCuotas,
-      fecha_inicio: fechaInicio,
-    });
     onOpenChange(false);
   }
+
+  const esPlanFijo =
+    prestamo.tipo_prestamo === "cuotas_manuales" ||
+    prestamo.tipo_prestamo === "cuotas_fijas";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -86,57 +82,78 @@ export function PrestamoEditModal({
         <DialogHeader>
           <DialogTitle>Editar Préstamo</DialogTitle>
           <DialogDescription>
-            Cliente: <strong>{prestamo.cliente.nombre}</strong>
+            Cliente: <strong>{prestamo.cliente.nombre}</strong> —{" "}
+            {formatTipoPrestamo(prestamo.tipo_prestamo)}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          {esPlanFijo ? (
+            <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm text-slate-600">
+              <p>
+                Capital: <strong>{formatCurrency(prestamo.monto_prestado)}</strong>
+              </p>
+              <p className="mt-1">
+                Saldo pendiente:{" "}
+                <strong>{formatCurrency(prestamo.saldo_pendiente)}</strong>
+              </p>
+              {prestamo.tipo_prestamo === "cuotas_fijas" && prestamo.valor_cuota && (
+                <p className="mt-1">
+                  {prestamo.total_cuotas} cuotas de{" "}
+                  {formatCurrency(prestamo.valor_cuota)} —{" "}
+                  {formatFrecuencia(prestamo.frecuencia)}
+                </p>
+              )}
+              {prestamo.tipo_prestamo === "cuotas_manuales" && (
+                <p className="mt-1">
+                  {prestamo.plan_cuotas.length} cuotas — {prestamo.cuotas_pagadas}{" "}
+                  pagadas
+                </p>
+              )}
+              <p className="mt-2 text-xs text-slate-500">
+                El plan de cuotas no se edita aquí para preservar el historial.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Capital vigente</Label>
+                  <Input value={formatCurrency(prestamo.saldo_capital)} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_interes">Interés por período ($)</Label>
+                  <Input
+                    id="edit_interes"
+                    type="number"
+                    min={0}
+                    value={valorInteres || ""}
+                    onChange={(e) => setValorInteres(Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="edit_frecuencia">Frecuencia de cobro</Label>
+                  <Select
+                    value={frecuencia}
+                    onValueChange={(v) => setFrecuencia(v as FrecuenciaPago)}
+                  >
+                    <SelectTrigger id="edit_frecuencia">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {frecuenciasInteres.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {f.charAt(0).toUpperCase() + f.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="edit_monto">Monto Prestado</Label>
-            <Input
-              id="edit_monto"
-              type="number"
-              min={1}
-              value={monto || ""}
-              onChange={(e) => setMonto(Number(e.target.value))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit_frecuencia">Frecuencia</Label>
-            <Select value={frecuencia} onValueChange={(v) => setFrecuencia(v as FrecuenciaPago)}>
-              <SelectTrigger id="edit_frecuencia">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {frecuencias.map((f) => (
-                  <SelectItem key={f} value={f}>
-                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit_cuotas">Número de Cuotas</Label>
-            <Input
-              id="edit_cuotas"
-              type="number"
-              min={1}
-              value={totalCuotas || ""}
-              onChange={(e) => setTotalCuotas(Number(e.target.value))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit_valor_cuota">Valor de Cuota</Label>
-            <Input
-              id="edit_valor_cuota"
-              type="number"
-              min={1}
-              value={valorCuota || ""}
-              onChange={(e) => setValorCuota(Number(e.target.value))}
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="edit_fecha">Fecha de Inicio</Label>
             <Input
               id="edit_fecha"
@@ -146,18 +163,7 @@ export function PrestamoEditModal({
             />
           </div>
 
-          {totalEsperado > 0 && (
-            <div className="sm:col-span-2 rounded-lg bg-blue-50 border border-blue-100 p-3 text-sm text-blue-800">
-              Total a pagar: <strong>{formatCurrency(totalEsperado)}</strong>
-              {monto > 0 && (
-                <span className="ml-2 text-blue-600">
-                  (Interés: {formatCurrency(totalEsperado - monto)})
-                </span>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="sm:col-span-2">
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

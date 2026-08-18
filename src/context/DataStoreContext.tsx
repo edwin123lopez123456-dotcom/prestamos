@@ -10,14 +10,17 @@ import {
   type ReactNode,
 } from "react";
 import type {
-  Abono,
   AlertaRapida,
   Cliente,
   DatoGrafico,
   EstadoCartera,
   MetricasDashboard,
   MoraCliente,
+  NuevoAbonoInput,
   NuevoPrestamoInput,
+  NuevoPrestamoSimuladoInput,
+  NuevoAbonoAvanzadoInput,
+  PlanCuota,
   Prestamo,
   PrestamoConCliente,
 } from "@/types";
@@ -39,16 +42,19 @@ import {
   updateClienteDb,
   deleteClienteDb,
   insertPrestamo,
+  insertPrestamoSimulado,
   updatePrestamoDb,
   deletePrestamoDb,
   registrarAbonoDb,
+  setClienteActivoDb,
 } from "@/lib/database";
 import { getSupabaseConfigError, isSupabaseConfigured } from "@/lib/supabase";
 
 interface DataStoreContextType {
   clientes: Cliente[];
   prestamos: Prestamo[];
-  abonos: Abono[];
+  abonos: import("@/types").Abono[];
+  planCuotas: PlanCuota[];
   prestamosEnriquecidos: PrestamoConCliente[];
   metricas: MetricasDashboard;
   estadoCartera: EstadoCartera;
@@ -64,9 +70,19 @@ interface DataStoreContextType {
   deleteCliente: (id: string) => Promise<boolean>;
   addClientesBulk: (items: Omit<Cliente, "id">[]) => Promise<void>;
   addPrestamo: (input: NuevoPrestamoInput) => Promise<void>;
+  addPrestamoSimulado: (input: NuevoPrestamoSimuladoInput) => Promise<Prestamo>;
   updatePrestamo: (id: string, data: Partial<Prestamo>) => Promise<void>;
   deletePrestamo: (id: string) => Promise<void>;
-  registrarAbono: (prestamoId: string, abono: Omit<Abono, "id">) => Promise<void>;
+  registrarAbono: (prestamoId: string, abono: NuevoAbonoInput) => Promise<void>;
+  registrarAbonoAvanzado: (
+    prestamoId: string,
+    abono: NuevoAbonoAvanzadoInput
+  ) => Promise<void>;
+  setClienteActivo: (id: string, activo: boolean) => Promise<void>;
+  getClienteById: (id: string) => Cliente | undefined;
+  getPrestamosByCliente: (clienteId: string) => PrestamoConCliente[];
+  getPrestamoEnriquecido: (prestamoId: string) => PrestamoConCliente | undefined;
+  getAbonosByPrestamo: (prestamoId: string) => import("@/types").Abono[];
   clienteTienePrestamos: (clienteId: string) => boolean;
 }
 
@@ -81,7 +97,8 @@ export function useDataStore() {
 export function DataStoreProvider({ children }: { children: ReactNode }) {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
-  const [abonos, setAbonos] = useState<Abono[]>([]);
+  const [abonos, setAbonos] = useState<import("@/types").Abono[]>([]);
+  const [planCuotas, setPlanCuotas] = useState<PlanCuota[]>([]);
   const [loading, setLoading] = useState(true);
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +119,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setClientes(data.clientes);
       setPrestamos(data.prestamos);
       setAbonos(data.abonos);
+      setPlanCuotas(data.planCuotas);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar datos");
     } finally {
@@ -119,8 +137,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   }, [loadData]);
 
   const prestamosEnriquecidos = useMemo(
-    () => enriquecerPrestamos(prestamos, clientes, abonos),
-    [prestamos, clientes, abonos]
+    () => enriquecerPrestamos(prestamos, clientes, abonos, planCuotas),
+    [prestamos, clientes, abonos, planCuotas]
   );
 
   const metricas = useMemo((): MetricasDashboard => {
@@ -229,8 +247,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const addPrestamo = useCallback(
     async (input: NuevoPrestamoInput) => {
       await runMutation(async () => {
-        const nuevo = await insertPrestamo(input);
-        setPrestamos((prev) => [nuevo, ...prev]);
+        const { prestamo, planCuotas: nuevasCuotas } = await insertPrestamo(input);
+        setPrestamos((prev) => [prestamo, ...prev]);
+        setPlanCuotas((prev) => [...prev, ...nuevasCuotas]);
       });
     },
     [runMutation]
@@ -243,6 +262,17 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         setPrestamos((prev) =>
           prev.map((p) => (p.id === id ? { ...p, ...data } : p))
         );
+        if (data.valor_cuota != null) {
+          setPlanCuotas((prev) =>
+            prev.map((c) =>
+              c.prestamo_id === id &&
+              c.tipo_cuota === "interes" &&
+              c.estado !== "pagada"
+                ? { ...c, monto_cuota: data.valor_cuota! }
+                : c
+            )
+          );
+        }
       });
     },
     [runMutation]
@@ -254,35 +284,89 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         await deletePrestamoDb(id);
         setPrestamos((prev) => prev.filter((p) => p.id !== id));
         setAbonos((prev) => prev.filter((a) => a.prestamo_id !== id));
+        setPlanCuotas((prev) => prev.filter((c) => c.prestamo_id !== id));
       });
     },
     [runMutation]
   );
 
   const registrarAbono = useCallback(
-    async (prestamoId: string, nuevoAbono: Omit<Abono, "id">) => {
+    async (prestamoId: string, input: NuevoAbonoInput) => {
       const prestamo = prestamos.find((p) => p.id === prestamoId);
       if (!prestamo) return;
 
       await runMutation(async () => {
-        const { prestamoActualizado, abono } = await registrarAbonoDb(
-          prestamo,
-          abonos,
-          nuevoAbono
-        );
+        const { prestamoActualizado, planCuotasActualizado, abono } =
+          await registrarAbonoDb(prestamo, planCuotas, abonos, input);
         setPrestamos((prev) =>
           prev.map((p) => (p.id === prestamoId ? prestamoActualizado : p))
         );
+        setPlanCuotas(planCuotasActualizado);
         setAbonos((prev) => [abono, ...prev]);
       });
     },
-    [prestamos, abonos, runMutation]
+    [prestamos, planCuotas, abonos, runMutation]
+  );
+
+  const registrarAbonoAvanzado = useCallback(
+    async (prestamoId: string, input: NuevoAbonoAvanzadoInput) => {
+      await registrarAbono(prestamoId, input);
+    },
+    [registrarAbono]
+  );
+
+  const addPrestamoSimulado = useCallback(
+    async (input: NuevoPrestamoSimuladoInput) => {
+      return runMutation(async () => {
+        const { prestamo, planCuotas: nuevasCuotas } =
+          await insertPrestamoSimulado(input);
+        setPrestamos((prev) => [prestamo, ...prev]);
+        setPlanCuotas((prev) => [...prev, ...nuevasCuotas]);
+        return prestamo;
+      });
+    },
+    [runMutation]
+  );
+
+  const setClienteActivo = useCallback(
+    async (id: string, activo: boolean) => {
+      await runMutation(async () => {
+        await setClienteActivoDb(id, activo);
+        setClientes((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, activo } : c))
+        );
+      });
+    },
+    [runMutation]
+  );
+
+  const getClienteById = useCallback(
+    (id: string) => clientes.find((c) => c.id === id),
+    [clientes]
+  );
+
+  const getPrestamosByCliente = useCallback(
+    (clienteId: string) =>
+      prestamosEnriquecidos.filter((p) => p.cliente_id === clienteId),
+    [prestamosEnriquecidos]
+  );
+
+  const getPrestamoEnriquecido = useCallback(
+    (prestamoId: string) =>
+      prestamosEnriquecidos.find((p) => p.id === prestamoId),
+    [prestamosEnriquecidos]
+  );
+
+  const getAbonosByPrestamo = useCallback(
+    (prestamoId: string) => abonos.filter((a) => a.prestamo_id === prestamoId),
+    [abonos]
   );
 
   const value: DataStoreContextType = {
     clientes,
     prestamos,
     abonos,
+    planCuotas,
     prestamosEnriquecidos,
     metricas,
     estadoCartera,
@@ -298,9 +382,16 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     deleteCliente,
     addClientesBulk,
     addPrestamo,
+    addPrestamoSimulado,
     updatePrestamo,
     deletePrestamo,
     registrarAbono,
+    registrarAbonoAvanzado,
+    setClienteActivo,
+    getClienteById,
+    getPrestamosByCliente,
+    getPrestamoEnriquecido,
+    getAbonosByPrestamo,
     clienteTienePrestamos,
   };
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, createContext, useContext, ReactNode } from "react";
+import { useState, createContext, useContext, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { BottomNav } from "./BottomNav";
 import { DataStoreProvider } from "@/context/DataStoreContext";
 
 interface AppContextType {
@@ -30,15 +31,18 @@ export function MainLayout({ children }: MainLayoutProps) {
   return (
     <AppContext.Provider value={{ searchQuery, setSearchQuery }}>
       <DataStoreProvider>
-        <div className="flex h-screen overflow-hidden bg-slate-50">
+        <div className="flex min-h-[100dvh] bg-slate-100">
           <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex flex-1 flex-col min-w-0">
             <TopBar
               onMenuClick={() => setSidebarOpen(true)}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
             />
-            <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
+            <main className="flex-1 overflow-y-auto pb-20 lg:pb-6 px-3 pt-3 sm:px-4 lg:px-6 lg:pt-6">
+              {children}
+            </main>
+            <BottomNav />
           </div>
         </div>
       </DataStoreProvider>

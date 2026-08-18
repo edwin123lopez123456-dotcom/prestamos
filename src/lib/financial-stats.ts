@@ -1,16 +1,10 @@
 import type { MetricasDashboard, PrestamoConCliente, EstadoCartera } from "@/types";
+import { saldoCuotaPlan } from "@/lib/calculations";
 
 export interface MetricasFinancieras extends MetricasDashboard {
   estado_cartera: EstadoCartera;
 }
-
-/** Interés total de un préstamo = total cuotas − capital prestado */
-export function calcularInteresTotal(prestamo: PrestamoConCliente): number {
-  const totalEsperado = prestamo.valor_cuota * prestamo.total_cuotas;
-  return Math.max(0, totalEsperado - prestamo.monto_prestado);
-}
-
-/** Calcula intereses ganados y por cobrar a partir de préstamos enriquecidos */
+/** Intereses ganados y por cobrar según tipo de préstamo */
 export function calcularIntereses(prestamos: PrestamoConCliente[]): {
   intereses_ganados: number;
   intereses_por_cobrar: number;
@@ -19,16 +13,30 @@ export function calcularIntereses(prestamos: PrestamoConCliente[]): {
   let intereses_por_cobrar = 0;
 
   for (const p of prestamos) {
-    const totalEsperado = p.valor_cuota * p.total_cuotas;
-    if (totalEsperado <= 0) continue;
+    if (p.tipo_prestamo === "solo_interes") {
+      const capitalAbonado = p.monto_prestado - p.saldo_capital;
+      const interesPagado = Math.max(0, p.total_abonado - capitalAbonado);
+      intereses_ganados += interesPagado;
 
-    const interesTotal = calcularInteresTotal(p);
-    const ratioPagado = Math.min(1, p.total_abonado / totalEsperado);
+      if (p.estado !== "pagado") {
+        const interesPendiente = p.plan_cuotas
+          .filter((c) => c.tipo_cuota === "interes" && c.estado !== "pagada")
+          .reduce((s, c) => s + saldoCuotaPlan(c), 0);
+        intereses_por_cobrar += interesPendiente;
+      }
+      continue;
+    }
 
-    intereses_ganados += interesTotal * ratioPagado;
+    const totalPlan = p.plan_cuotas.reduce((s, c) => s + c.monto_cuota, 0);
+    const interesTotal = Math.max(0, totalPlan - p.monto_prestado);
+    if (totalPlan <= 0) continue;
+
+    const pagadoPlan = p.plan_cuotas.reduce((s, c) => s + c.monto_pagado, 0);
+    const ratio = Math.min(1, pagadoPlan / totalPlan);
+    intereses_ganados += interesTotal * ratio;
 
     if (p.estado !== "pagado") {
-      intereses_por_cobrar += interesTotal * (1 - ratioPagado);
+      intereses_por_cobrar += interesTotal * (1 - ratio);
     }
   }
 
@@ -38,7 +46,6 @@ export function calcularIntereses(prestamos: PrestamoConCliente[]): {
   };
 }
 
-/** Distribución de préstamos activos por semáforo de mora */
 export function calcularEstadoCartera(
   prestamos: PrestamoConCliente[]
 ): EstadoCartera {
@@ -50,7 +57,6 @@ export function calcularEstadoCartera(
   };
 }
 
-/** Total recaudado hoy desde abonos */
 export function calcularRecaudadoHoy(
   abonos: { monto_abonado: number; fecha_abono: string }[],
   fechaReferencia: Date = new Date()

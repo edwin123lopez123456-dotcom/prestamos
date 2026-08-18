@@ -52,6 +52,7 @@ export function ClienteFormModal({
       telefono: telefono.trim(),
       descripcion: descripcion.trim(),
       fecha_registro: cliente?.fecha_registro ?? new Date().toISOString().split("T")[0],
+      activo: cliente?.activo ?? true,
     });
 
     onOpenChange(false);

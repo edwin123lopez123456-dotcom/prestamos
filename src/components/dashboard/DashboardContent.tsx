@@ -8,6 +8,7 @@ import {
   Percent,
   PiggyBank,
   RefreshCw,
+  Download,
 } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ChartSection } from "@/components/dashboard/ChartSection";
@@ -16,10 +17,20 @@ import { CarteraPieChart } from "@/components/dashboard/CarteraPieChart";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { Button } from "@/components/ui/button";
 import { useDataStore } from "@/context/DataStoreContext";
+import { exportarReporteFinancieroExcel } from "@/lib/excel";
 
 export function DashboardContent() {
-  const { metricas, alertas, datosGrafico, estadoCartera, loading, error, refresh, mutating } =
-    useDataStore();
+  const {
+    metricas,
+    alertas,
+    datosGrafico,
+    estadoCartera,
+    prestamosEnriquecidos,
+    loading,
+    error,
+    refresh,
+    mutating,
+  } = useDataStore();
 
   if (loading) {
     return <LoadingState message="Cargando dashboard..." fullPage />;
@@ -45,16 +56,29 @@ export function DashboardContent() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Resumen financiero</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Resumen general de tu cartera de préstamos
+            Reportes y alertas de cartera
           </p>
         </div>
-        {mutating && (
-          <span className="text-xs text-blue-600 font-medium animate-pulse">
-            Guardando...
-          </span>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              exportarReporteFinancieroExcel(metricas, prestamosEnriquecidos)
+            }
+            disabled={mutating}
+          >
+            <Download className="h-4 w-4" />
+            Exportar reporte
+          </Button>
+          {mutating && (
+            <span className="text-xs text-blue-600 font-medium animate-pulse self-center">
+              Guardando...
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

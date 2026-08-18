@@ -10,19 +10,21 @@ import { PrestamoEditModal } from "./PrestamoEditModal";
 import { ConfirmDeleteDialog } from "@/components/shared/ConfirmDeleteDialog";
 import { MoraSemaforo, MoraDot } from "@/components/shared/MoraSemaforo";
 import { useDataStore } from "@/context/DataStoreContext";
-import type { Abono, Prestamo, PrestamoConCliente } from "@/types";
+import type { NuevoAbonoInput, Prestamo, PrestamoConCliente } from "@/types";
 import {
   formatCurrency,
   formatDate,
   formatEstado,
   formatFrecuencia,
+  formatTipoPrestamo,
 } from "@/lib/utils";
 import { exportarPrestamosExcel } from "@/lib/excel";
 import { useAppContext } from "@/components/layout/MainLayout";
+import { contarCuotasPagadas } from "@/lib/calculations";
 
 interface PrestamosListProps {
   prestamos: PrestamoConCliente[];
-  onAbono: (prestamoId: string, abono: Omit<Abono, "id">) => Promise<void>;
+  onAbono: (prestamoId: string, abono: NuevoAbonoInput) => Promise<void>;
   disabled?: boolean;
 }
 
@@ -33,6 +35,40 @@ function EstadoBadge({ estado }: { estado: Prestamo["estado"] }) {
     atrasado: "destructive",
   };
   return <Badge variant={variants[estado]}>{formatEstado(estado)}</Badge>;
+}
+
+function calcularProgreso(prestamo: PrestamoConCliente): number {
+  if (prestamo.estado === "pagado") return 100;
+  if (prestamo.tipo_prestamo === "solo_interes") {
+    if (prestamo.monto_prestado <= 0) return 0;
+    const capitalPagado = prestamo.monto_prestado - prestamo.saldo_capital;
+    return Math.min(100, (capitalPagado / prestamo.monto_prestado) * 100);
+  }
+  const total = prestamo.plan_cuotas.length || prestamo.total_cuotas || 0;
+  if (total === 0) return 0;
+  return (contarCuotasPagadas(prestamo.plan_cuotas) / total) * 100;
+}
+
+function textoProgreso(prestamo: PrestamoConCliente): string {
+  if (prestamo.tipo_prestamo === "solo_interes") {
+    return `Capital: ${formatCurrency(prestamo.saldo_capital)} de ${formatCurrency(prestamo.monto_prestado)}`;
+  }
+  const pagadas = contarCuotasPagadas(prestamo.plan_cuotas);
+  const total = prestamo.plan_cuotas.length || prestamo.total_cuotas || 0;
+  return `${pagadas}/${total} cuotas`;
+}
+
+function textoCuota(prestamo: PrestamoConCliente): string {
+  if (prestamo.tipo_prestamo === "solo_interes") {
+    return prestamo.valor_cuota
+      ? `${formatCurrency(prestamo.valor_cuota)} / ${formatFrecuencia(prestamo.frecuencia)}`
+      : "—";
+  }
+  if (prestamo.tipo_prestamo === "cuotas_fijas" && prestamo.valor_cuota) {
+    return `${formatCurrency(prestamo.valor_cuota)} fijas`;
+  }
+  const prox = prestamo.proxima_cuota;
+  return prox ? formatCurrency(prox.monto_cuota) : "—";
 }
 
 export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListProps) {
@@ -48,7 +84,8 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
       (p) =>
         p.cliente.nombre.toLowerCase().includes(q) ||
         p.id.toLowerCase().includes(q) ||
-        formatEstado(p.estado).toLowerCase().includes(q)
+        formatEstado(p.estado).toLowerCase().includes(q) ||
+        formatTipoPrestamo(p.tipo_prestamo).toLowerCase().includes(q)
     );
   }, [prestamos, searchQuery]);
 
@@ -73,23 +110,22 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
       </div>
 
       <p className="text-sm text-slate-500">
-        {prestamosFiltrados.length} préstamo{prestamosFiltrados.length !== 1 ? "s" : ""} activo{prestamosFiltrados.length !== 1 ? "s" : ""}
+        {prestamosFiltrados.length} préstamo{prestamosFiltrados.length !== 1 ? "s" : ""}
       </p>
 
-      {/* Tabla desktop */}
       <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
               <th className="px-4 py-3 text-left font-medium text-slate-600 w-8"></th>
               <th className="px-4 py-3 text-left font-medium text-slate-600">Cliente</th>
-              <th className="px-4 py-3 text-left font-medium text-slate-600">Monto</th>
-              <th className="px-4 py-3 text-left font-medium text-slate-600">Cuota</th>
+              <th className="px-4 py-3 text-left font-medium text-slate-600">Tipo</th>
+              <th className="px-4 py-3 text-left font-medium text-slate-600">Capital</th>
+              <th className="px-4 py-3 text-left font-medium text-slate-600">Próx. cuota</th>
               <th className="px-4 py-3 text-left font-medium text-slate-600">Progreso</th>
               <th className="px-4 py-3 text-left font-medium text-slate-600">Saldo</th>
               <th className="px-4 py-3 text-left font-medium text-slate-600">Mora</th>
               <th className="px-4 py-3 text-left font-medium text-slate-600">Estado</th>
-              <th className="px-4 py-3 text-left font-medium text-slate-600">Inicio</th>
               <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
             </tr>
           </thead>
@@ -104,27 +140,28 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
                 </td>
                 <td className="px-4 py-3">
                   <p className="font-medium text-slate-900">{prestamo.cliente.nombre}</p>
-                  <p className="text-xs text-slate-400">{formatFrecuencia(prestamo.frecuencia)}</p>
+                  <p className="text-xs text-slate-400">{formatDate(prestamo.fecha_inicio)}</p>
+                </td>
+                <td className="px-4 py-3">
+                  <Badge variant="outline" className="text-xs font-normal">
+                    {formatTipoPrestamo(prestamo.tipo_prestamo)}
+                  </Badge>
                 </td>
                 <td className="px-4 py-3 text-slate-700">
-                  {formatCurrency(prestamo.monto_prestado)}
+                  {prestamo.tipo_prestamo === "solo_interes"
+                    ? formatCurrency(prestamo.saldo_capital)
+                    : formatCurrency(prestamo.monto_prestado)}
                 </td>
-                <td className="px-4 py-3 text-slate-700">
-                  {formatCurrency(prestamo.valor_cuota)}
-                </td>
+                <td className="px-4 py-3 text-slate-700">{textoCuota(prestamo)}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-20 rounded-full bg-slate-200 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-blue-600 transition-all"
-                        style={{
-                          width: `${(prestamo.cuotas_pagadas / prestamo.total_cuotas) * 100}%`,
-                        }}
+                        style={{ width: `${calcularProgreso(prestamo)}%` }}
                       />
                     </div>
-                    <span className="text-xs text-slate-500">
-                      {prestamo.cuotas_pagadas}/{prestamo.total_cuotas}
-                    </span>
+                    <span className="text-xs text-slate-500">{textoProgreso(prestamo)}</span>
                   </div>
                 </td>
                 <td className="px-4 py-3 font-medium text-slate-900">
@@ -140,17 +177,14 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
                 <td className="px-4 py-3">
                   <EstadoBadge estado={prestamo.estado} />
                 </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {formatDate(prestamo.fecha_inicio)}
-                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
                     {prestamo.estado !== "pagado" && (
-                    <AbonoModal
-                      prestamo={prestamo}
-                      onAbono={(abono) => onAbono(prestamo.id, abono)}
-                      disabled={disabled}
-                    />
+                      <AbonoModal
+                        prestamo={prestamo}
+                        onAbono={(abono) => onAbono(prestamo.id, abono)}
+                        disabled={disabled}
+                      />
                     )}
                     <Button
                       size="sm"
@@ -178,7 +212,6 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
         </table>
       </div>
 
-      {/* Cards móvil/tablet */}
       <div className="lg:hidden space-y-3">
         {prestamosFiltrados.map((prestamo) => (
           <Card
@@ -202,7 +235,8 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
                   <div>
                     <p className="font-semibold text-slate-900">{prestamo.cliente.nombre}</p>
                     <p className="text-xs text-slate-400">
-                      {formatFrecuencia(prestamo.frecuencia)} — {formatDate(prestamo.fecha_inicio)}
+                      {formatTipoPrestamo(prestamo.tipo_prestamo)} —{" "}
+                      {formatDate(prestamo.fecha_inicio)}
                     </p>
                   </div>
                 </div>
@@ -216,12 +250,20 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
 
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <p className="text-xs text-slate-400">Monto prestado</p>
-                  <p className="font-medium">{formatCurrency(prestamo.monto_prestado)}</p>
+                  <p className="text-xs text-slate-400">
+                    {prestamo.tipo_prestamo === "solo_interes"
+                      ? "Capital vigente"
+                      : "Monto prestado"}
+                  </p>
+                  <p className="font-medium">
+                    {prestamo.tipo_prestamo === "solo_interes"
+                      ? formatCurrency(prestamo.saldo_capital)
+                      : formatCurrency(prestamo.monto_prestado)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Cuota</p>
-                  <p className="font-medium">{formatCurrency(prestamo.valor_cuota)}</p>
+                  <p className="text-xs text-slate-400">Próxima cuota</p>
+                  <p className="font-medium">{textoCuota(prestamo)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Saldo pendiente</p>
@@ -231,34 +273,26 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Progreso</p>
-                  <p className="font-medium">
-                    {prestamo.cuotas_pagadas}/{prestamo.total_cuotas} cuotas
-                  </p>
+                  <p className="font-medium">{textoProgreso(prestamo)}</p>
                 </div>
               </div>
 
               <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-blue-600 transition-all"
-                  style={{
-                    width: `${(prestamo.cuotas_pagadas / prestamo.total_cuotas) * 100}%`,
-                  }}
+                  style={{ width: `${calcularProgreso(prestamo)}%` }}
                 />
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {prestamo.estado !== "pagado" && (
-                    <AbonoModal
-                      prestamo={prestamo}
-                      onAbono={(abono) => onAbono(prestamo.id, abono)}
-                      disabled={disabled}
-                    />
+                  <AbonoModal
+                    prestamo={prestamo}
+                    onAbono={(abono) => onAbono(prestamo.id, abono)}
+                    disabled={disabled}
+                  />
                 )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditTarget(prestamo)}
-                >
+                <Button size="sm" variant="outline" onClick={() => setEditTarget(prestamo)}>
                   <Pencil className="h-3.5 w-3.5" />
                   Editar
                 </Button>
@@ -297,7 +331,7 @@ export function PrestamosList({ prestamos, onAbono, disabled }: PrestamosListPro
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
         title="¿Eliminar préstamo?"
-        description="Se eliminarán también todos los abonos asociados a este préstamo. Esta acción no se puede deshacer."
+        description="Se eliminarán también todos los abonos y cuotas asociadas. Esta acción no se puede deshacer."
         itemName={
           deleteTarget
             ? `${deleteTarget.cliente.nombre} — ${formatCurrency(deleteTarget.monto_prestado)}`

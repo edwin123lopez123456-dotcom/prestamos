@@ -52,6 +52,24 @@ export function formatEstado(estado: string): string {
   return labels[estado] ?? estado;
 }
 
+export function formatTipoPrestamo(tipo: string): string {
+  const labels: Record<string, string> = {
+    cuotas_fijas: "Cuotas fijas",
+    cuotas_manuales: "Cuotas manuales",
+    solo_interes: "Solo intereses",
+  };
+  return labels[tipo] ?? tipo;
+}
+
+export function formatTipoAbono(tipo: string): string {
+  const labels: Record<string, string> = {
+    cuota: "Abono a cuota",
+    interes: "Pago de interés",
+    capital: "Abono a capital",
+  };
+  return labels[tipo] ?? tipo;
+}
+
 /** Normaliza teléfono colombiano para enlace wa.me (57 + número) */
 export function normalizarTelefonoWhatsApp(telefono: string): string {
   const digits = telefono.replace(/\D/g, "");
@@ -66,7 +84,7 @@ export function generarEnlaceWhatsApp(telefono: string, mensaje: string): string
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 }
 
-/** Mensaje de recibo para WhatsApp */
+/** Mensaje de recibo para WhatsApp (formato clásico) */
 export function generarMensajeReciboWhatsApp(params: {
   negocio: string;
   clienteNombre: string;
@@ -78,6 +96,22 @@ export function generarMensajeReciboWhatsApp(params: {
     `Recibo de Pago de ${params.negocio}: Hola ${params.clienteNombre}, ` +
     `hemos registrado tu abono de ${formatCurrency(params.montoAbonado)} hoy ${params.fecha}. ` +
     `Tu nuevo saldo pendiente es ${formatCurrency(params.nuevoSaldo)}. ¡Gracias por tu pago!`
+  );
+}
+
+/** Comprobante optimizado para compartir en WhatsApp */
+export function generarComprobanteWhatsAppCobrapp(params: {
+  negocio: string;
+  clienteNombre: string;
+  montoAbonado: number;
+  nuevoSaldo: number;
+}): string {
+  return (
+    `🧾 COMPROBANTE DE PAGO - ${params.negocio}\n` +
+    `Cliente: ${params.clienteNombre}\n` +
+    `Abono recibido: ${formatCurrency(params.montoAbonado)}\n` +
+    `Saldo Pendiente: ${formatCurrency(params.nuevoSaldo)}\n` +
+    `¡Gracias por su puntualidad!`
   );
 }
 
