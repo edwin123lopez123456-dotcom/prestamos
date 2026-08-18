@@ -136,6 +136,7 @@ export function ClientesTable() {
   }
 
   function AccionesCliente({ cliente }: { cliente: Cliente }) {
+    const tienePrestamos = clienteTienePrestamos(cliente.id);
     return (
       <div className="flex items-center gap-1">
         <Button
@@ -153,9 +154,11 @@ export function ClientesTable() {
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-40"
           onClick={() => setDeleteTarget(cliente)}
-          aria-label="Eliminar"
+          disabled={tienePrestamos}
+          aria-label={tienePrestamos ? "No se puede eliminar: tiene créditos" : "Eliminar"}
+          title={tienePrestamos ? "Tiene créditos asociados" : "Eliminar cliente"}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -349,8 +352,14 @@ export function ClientesTable() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-40"
                     onClick={() => setDeleteTarget(cliente)}
+                    disabled={clienteTienePrestamos(cliente.id)}
+                    title={
+                      clienteTienePrestamos(cliente.id)
+                        ? "Tiene créditos asociados"
+                        : undefined
+                    }
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     Eliminar

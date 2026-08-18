@@ -1,13 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #f8fafc;
+  --color-background: #f1f5f9;
   --color-foreground: #0f172a;
+  --color-primary: #059669;
+  --color-primary-dark: #047857;
+  --color-primary-light: #d1fae5;
+  --color-card: #ffffff;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 * {
-  border-color: #e2e8f0;
+  border-color: var(--color-border);
 }
 
 body {
@@ -20,7 +26,86 @@ body {
   touch-action: manipulation;
 }
 
-/* Scrollbar personalizado */
+.page-gradient {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgb(16 185 129 / 0.08), transparent),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.app-card {
+  border-radius: 1rem;
+  border: 1px solid rgb(226 232 240 / 0.85);
+  background: var(--color-card);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 4px 12px rgb(15 23 42 / 0.03);
+}
+
+.app-card-interactive {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.app-card-interactive:hover {
+  border-color: rgb(110 231 183 / 0.6);
+  box-shadow:
+    0 4px 6px rgb(15 23 42 / 0.04),
+    0 12px 28px rgb(5 150 105 / 0.08);
+}
+
+.page-heading {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.page-subheading {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #64748b;
+}
+
+.filter-pill {
+  border-radius: 9999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.filter-pill-active {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgb(5 150 105 / 0.25);
+}
+
+.filter-pill-inactive {
+  border: 1px solid rgb(226 232 240 / 0.9);
+  background: white;
+  color: #475569;
+}
+
+.filter-pill-inactive:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.avatar-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 10px rgb(5 150 105 / 0.2);
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -36,7 +121,6 @@ body {
   background: #94a3b8;
 }
 
-/* ── Estilos de impresión para Recibo de Pago ── */
 @media print {
   body * {
     visibility: hidden !important;

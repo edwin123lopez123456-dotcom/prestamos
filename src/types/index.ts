@@ -155,6 +155,7 @@ export interface EstadoCartera {
 export interface AlertaRapida {
   id: string;
   tipo: "atrasado" | "proximo";
+  cliente_id: string;
   cliente_nombre: string;
   prestamo_id: string;
   monto_cuota: number;

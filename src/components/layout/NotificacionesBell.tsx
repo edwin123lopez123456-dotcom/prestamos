@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, AlertTriangle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDataStore } from "@/context/DataStoreContext";
+import { rutaAlertaPrestamo } from "@/lib/alert-navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { MoraSemaforo } from "@/components/shared/MoraSemaforo";
-import type { InfoMora } from "@/types";
+import type { AlertaRapida, InfoMora } from "@/types";
 
 function moraFromAlerta(alerta: {
   dias_retraso?: number;
@@ -20,7 +22,47 @@ function moraFromAlerta(alerta: {
   };
 }
 
+function AlertaItem({
+  alerta,
+  icon,
+  onNavigate,
+}: {
+  alerta: AlertaRapida;
+  icon: React.ReactNode;
+  onNavigate: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onNavigate}
+      className="w-full px-4 py-3 flex gap-2 text-left hover:bg-slate-50 transition-colors"
+    >
+      {icon}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-900 truncate">
+          {alerta.cliente_nombre}
+        </p>
+        {alerta.tipo === "atrasado" ? (
+          <>
+            <p className="text-xs text-slate-500">
+              Cuota {formatCurrency(alerta.monto_cuota)} ·{" "}
+              {alerta.dias_retraso ?? 0} días de atraso
+            </p>
+            <MoraSemaforo mora={moraFromAlerta(alerta)} size="sm" />
+          </>
+        ) : (
+          <p className="text-xs text-slate-500">
+            {formatCurrency(alerta.monto_cuota)}
+            {alerta.fecha_cobro && ` · vence ${formatDate(alerta.fecha_cobro)}`}
+          </p>
+        )}
+      </div>
+    </button>
+  );
+}
+
 export function NotificacionesBell() {
+  const router = useRouter();
   const { alertas, loading } = useDataStore();
   const [abierto, setAbierto] = useState(false);
 
@@ -28,6 +70,11 @@ export function NotificacionesBell() {
   const proximos = alertas.filter((a) => a.tipo === "proximo");
   const total = atrasados.length;
   const tieneRojo = atrasados.some((a) => a.semaforo === "rojo");
+
+  function irAAlerta(alerta: AlertaRapida) {
+    setAbierto(false);
+    router.push(rutaAlertaPrestamo(alerta));
+  }
 
   if (loading) return null;
 
@@ -77,44 +124,31 @@ export function NotificacionesBell() {
               ) : (
                 <div className="divide-y divide-slate-100">
                   {atrasados.map((alerta) => (
-                    <div key={alerta.id} className="px-4 py-3 flex gap-2">
-                      <AlertTriangle
-                        className={`h-4 w-4 shrink-0 mt-0.5 ${
-                          alerta.semaforo === "rojo"
-                            ? "text-red-500"
-                            : "text-amber-500"
-                        }`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {alerta.cliente_nombre}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Cuota {formatCurrency(alerta.monto_cuota)} ·{" "}
-                          {alerta.dias_retraso ?? 0} días de atraso
-                        </p>
-                        <MoraSemaforo
-                          mora={moraFromAlerta(alerta)}
-                          size="sm"
+                    <AlertaItem
+                      key={alerta.id}
+                      alerta={alerta}
+                      onNavigate={() => irAAlerta(alerta)}
+                      icon={
+                        <AlertTriangle
+                          className={`h-4 w-4 shrink-0 mt-0.5 ${
+                            alerta.semaforo === "rojo"
+                              ? "text-red-500"
+                              : "text-amber-500"
+                          }`}
                         />
-                      </div>
-                    </div>
+                      }
+                    />
                   ))}
 
                   {proximos.slice(0, 5).map((alerta) => (
-                    <div key={alerta.id} className="px-4 py-3 flex gap-2">
-                      <Clock className="h-4 w-4 shrink-0 mt-0.5 text-emerald-500" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {alerta.cliente_nombre}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {formatCurrency(alerta.monto_cuota)}
-                          {alerta.fecha_cobro &&
-                            ` · vence ${formatDate(alerta.fecha_cobro)}`}
-                        </p>
-                      </div>
-                    </div>
+                    <AlertaItem
+                      key={alerta.id}
+                      alerta={alerta}
+                      onNavigate={() => irAAlerta(alerta)}
+                      icon={
+                        <Clock className="h-4 w-4 shrink-0 mt-0.5 text-emerald-500" />
+                      }
+                    />
                   ))}
                 </div>
               )}

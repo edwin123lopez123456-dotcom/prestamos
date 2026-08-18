@@ -12,7 +12,8 @@ import { useDataStore } from "@/context/DataStoreContext";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { LABEL_TIPO_INTERES } from "@/lib/loan-simulator";
 import { cn } from "@/lib/utils";
-import type { PlanCuota } from "@/types";
+import { PrestamoEditModal } from "@/components/prestamos/PrestamoEditModal";
+import type { PlanCuota, Prestamo } from "@/types";
 
 type FiltroCuota = "todas" | "pendientes" | "pagadas" | "vencidas" | "anuladas";
 
@@ -50,12 +51,14 @@ export function PrestamoDetalleView({
     getPrestamoEnriquecido,
     getAbonosByPrestamo,
     deletePrestamo,
+    updatePrestamo,
   } = useDataStore();
 
   const prestamo = getPrestamoEnriquecido(prestamoId);
   const abonos = getAbonosByPrestamo(prestamoId);
   const [filtro, setFiltro] = useState<FiltroCuota>("pendientes");
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const cuotasFiltradas = useMemo(
     () => (prestamo ? filtrarCuotas(prestamo.plan_cuotas, filtro) : []),
@@ -90,10 +93,10 @@ export function PrestamoDetalleView({
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="page-heading">
             Crédito {formatCurrency(prestamo.monto_prestado)}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="page-subheading">
             {prestamo.tipo_interes
               ? LABEL_TIPO_INTERES[prestamo.tipo_interes]
               : prestamo.tipo_prestamo}{" "}
@@ -115,7 +118,7 @@ export function PrestamoDetalleView({
           >
             <DollarSign className="h-4 w-4" /> Registrar abono
           </Button>
-          <Button variant="outline" size="sm" disabled>
+          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4" /> Editar
           </Button>
           <Button
@@ -252,6 +255,20 @@ export function PrestamoDetalleView({
           )}
         </CardContent>
       </Card>
+
+      <PrestamoEditModal
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        prestamo={prestamo}
+        onSave={async (data: Partial<Prestamo>) => {
+          try {
+            await updatePrestamo(prestamoId, data);
+          } catch {
+            alert("No se pudo actualizar el crédito.");
+            throw new Error("update failed");
+          }
+        }}
+      />
 
       <ConfirmDeleteDialog
         open={deleteOpen}

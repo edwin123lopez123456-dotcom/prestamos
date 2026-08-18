@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Minus, Plus, Printer, Save } from "lucide-react";
+import { MessageCircle, Minus, Plus, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,7 @@ import {
   generarComprobanteWhatsAppCobrapp,
   generarEnlaceWhatsApp,
   NEGOCIO_NOMBRE,
+  telefonoValidoWhatsApp,
 } from "@/lib/utils";
 import { LABEL_APLICACION_ABONO } from "@/lib/loan-simulator";
 import type { AplicacionAbono, TipoAbono } from "@/types";
@@ -177,7 +178,7 @@ export function AbonoAvanzadoForm({ clienteId, prestamoId }: AbonoAvanzadoFormPr
       />
 
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Registrar abono</h1>
+        <h1 className="page-heading">Registrar abono</h1>
         <p className="text-sm text-slate-500">{prestamo.cliente.nombre}</p>
       </div>
 
@@ -395,7 +396,7 @@ export function AbonoAvanzadoForm({ clienteId, prestamoId }: AbonoAvanzadoFormPr
       </Card>
 
       <div className="grid gap-2">
-        {mensajeWhatsApp && prestamo.cliente.telefono && (
+        {mensajeWhatsApp && telefonoValidoWhatsApp(prestamo.cliente.telefono) && (
           <Button
             asChild
             variant="outline"
@@ -428,14 +429,6 @@ export function AbonoAvanzadoForm({ clienteId, prestamoId }: AbonoAvanzadoFormPr
             />
           </div>
         )}
-
-        <Button
-          variant="outline"
-          className="h-12"
-          onClick={() => window.print()}
-        >
-          <Printer className="h-4 w-4" /> Imprimir recibo
-        </Button>
 
         <Button
           className="h-14 text-base font-bold bg-emerald-600 hover:bg-emerald-700"

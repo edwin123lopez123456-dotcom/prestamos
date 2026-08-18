@@ -169,7 +169,7 @@ export function AbonoModal({ prestamo, onAbono, disabled }: AbonoModalProps) {
                     }}
                     className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${
                       tipoAbono === "interes"
-                        ? "border-blue-600 bg-blue-50 text-blue-800"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-800"
                         : "border-slate-200 text-slate-600"
                     }`}
                   >

@@ -20,7 +20,9 @@ export function LoadingState({
         className
       )}
     >
-      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">
+        <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
+      </div>
       <p className="text-sm font-medium">{message}</p>
     </div>
   );

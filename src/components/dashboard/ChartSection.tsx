@@ -62,8 +62,8 @@ export function ChartSection({ data }: ChartSectionProps) {
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Bar dataKey="recaudado" name="Recaudado" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="prestado" name="Prestado" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="recaudado" name="Recaudado" fill="#059669" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="prestado" name="Prestado" fill="#94a3b8" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -91,9 +91,9 @@ export function ChartSection({ data }: ChartSectionProps) {
                   type="monotone"
                   dataKey="recaudado"
                   name="Recaudado"
-                  stroke="#2563eb"
+                  stroke="#059669"
                   strokeWidth={2}
-                  dot={{ fill: "#2563eb", r: 4 }}
+                  dot={{ fill: "#059669", r: 4 }}
                   activeDot={{ r: 6 }}
                 />
               </LineChart>

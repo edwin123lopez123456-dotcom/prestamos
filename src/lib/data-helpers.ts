@@ -74,6 +74,7 @@ export function generarAlertas(prestamos: PrestamoConCliente[]): AlertaRapida[] 
       alertas.push({
         id: `alert-atraso-${p.id}`,
         tipo: "atrasado",
+        cliente_id: p.cliente_id,
         cliente_nombre: p.cliente.nombre,
         prestamo_id: p.id,
         monto_cuota: montoCuota,
@@ -85,6 +86,7 @@ export function generarAlertas(prestamos: PrestamoConCliente[]): AlertaRapida[] 
       alertas.push({
         id: `alert-proximo-${p.id}`,
         tipo: "proximo",
+        cliente_id: p.cliente_id,
         cliente_nombre: p.cliente.nombre,
         prestamo_id: p.id,
         monto_cuota: montoCuota,

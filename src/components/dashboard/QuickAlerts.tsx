@@ -1,6 +1,10 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { AlertTriangle, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MoraSemaforo, getSemaforoBorderClass } from "@/components/shared/MoraSemaforo";
+import { rutaAlertaPrestamo } from "@/lib/alert-navigation";
 import type { AlertaRapida, InfoMora } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -17,6 +21,7 @@ function moraFromAlerta(alerta: AlertaRapida): InfoMora {
 }
 
 export function QuickAlerts({ alertas }: QuickAlertsProps) {
+  const router = useRouter();
   const atrasados = alertas.filter((a) => a.tipo === "atrasado");
   const proximos = alertas.filter((a) => a.tipo === "proximo");
 
@@ -43,9 +48,11 @@ export function QuickAlerts({ alertas }: QuickAlertsProps) {
             </div>
             <div className="space-y-2">
               {atrasados.map((alerta) => (
-                <div
+                <button
                   key={alerta.id}
-                  className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border p-3 ${getSemaforoBorderClass(alerta.semaforo)}`}
+                  type="button"
+                  onClick={() => router.push(rutaAlertaPrestamo(alerta))}
+                  className={`w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border p-3 text-left hover:opacity-90 transition-opacity ${getSemaforoBorderClass(alerta.semaforo)}`}
                 >
                   <div className="flex items-start gap-2">
                     <MoraSemaforo mora={moraFromAlerta(alerta)} showLabel={false} size="sm" />
@@ -59,7 +66,7 @@ export function QuickAlerts({ alertas }: QuickAlertsProps) {
                     </div>
                   </div>
                   <MoraSemaforo mora={moraFromAlerta(alerta)} size="sm" />
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -75,9 +82,11 @@ export function QuickAlerts({ alertas }: QuickAlertsProps) {
             </div>
             <div className="space-y-2">
               {proximos.map((alerta) => (
-                <div
+                <button
                   key={alerta.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3"
+                  type="button"
+                  onClick={() => router.push(rutaAlertaPrestamo(alerta))}
+                  className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-left hover:bg-emerald-50 transition-colors"
                 >
                   <div className="flex items-start gap-2">
                     <MoraSemaforo mora={moraFromAlerta(alerta)} showLabel={false} size="sm" />
@@ -99,10 +108,16 @@ export function QuickAlerts({ alertas }: QuickAlertsProps) {
                       Vence: {formatDate(alerta.fecha_cobro)}
                     </span>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           </div>
+        )}
+
+        {atrasados.length === 0 && proximos.length === 0 && (
+          <p className="text-sm text-slate-400 text-center py-4">
+            Sin alertas pendientes
+          </p>
         )}
       </CardContent>
     </Card>

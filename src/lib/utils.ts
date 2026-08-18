@@ -78,6 +78,15 @@ export function normalizarTelefonoWhatsApp(telefono: string): string {
   return digits;
 }
 
+/** Indica si el teléfono puede usarse en wa.me (Colombia). */
+export function telefonoValidoWhatsApp(telefono: string | undefined | null): boolean {
+  if (!telefono?.trim()) return false;
+  const digits = telefono.replace(/\D/g, "");
+  if (digits.startsWith("57") && digits.length >= 12) return true;
+  if (digits.startsWith("3") && digits.length === 10) return true;
+  return digits.length >= 10;
+}
+
 /** Genera enlace de WhatsApp con mensaje preformateado */
 export function generarEnlaceWhatsApp(telefono: string, mensaje: string): string {
   const numero = normalizarTelefonoWhatsApp(telefono);

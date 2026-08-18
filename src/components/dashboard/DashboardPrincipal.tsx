@@ -58,15 +58,33 @@ export function DashboardPrincipal() {
   const metricasFiltradas = useMemo(() => {
     const abonosF = abonos.filter((a) => inPeriodo(a.fecha_abono, filtro));
     const recaudado = abonosF.reduce((s, a) => s + a.monto_abonado, 0);
+    const recaudadoTotal = abonos.reduce((s, a) => s + a.monto_abonado, 0);
     const activos = prestamosEnriquecidos.filter((p) => p.estado !== "pagado");
     const mora = activos.filter((p) => p.mora.dias_atraso > 0);
+
+    const interesesGanados =
+      filtro === "todo" || recaudadoTotal === 0
+        ? metricas.intereses_ganados
+        : Math.round(metricas.intereses_ganados * (recaudado / recaudadoTotal));
+
+    const proximosCobros =
+      filtro === "todo"
+        ? metricas.proximos_cobros
+        : alertas.filter(
+            (a) =>
+              a.tipo === "proximo" &&
+              a.fecha_cobro &&
+              inPeriodo(a.fecha_cobro, filtro)
+          ).length;
 
     return {
       ...metricas,
       total_recaudado_hoy: filtro === "hoy" ? metricas.total_recaudado_hoy : recaudado,
       clientes_en_mora: mora.length,
+      intereses_ganados: interesesGanados,
+      proximos_cobros: proximosCobros,
     };
-  }, [abonos, filtro, metricas, prestamosEnriquecidos]);
+  }, [abonos, alertas, filtro, metricas, prestamosEnriquecidos]);
 
   const graficoFiltrado = useMemo(() => {
     if (filtro === "todo") return datosGrafico;
@@ -77,14 +95,15 @@ export function DashboardPrincipal() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="page-heading">Dashboard</h1>
+          <p className="page-subheading">
             Estado general del negocio con filtros avanzados
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
+          className="self-start"
           onClick={() =>
             exportarReporteFinancieroExcel(metricasFiltradas, prestamosEnriquecidos)
           }
@@ -102,10 +121,8 @@ export function DashboardPrincipal() {
             type="button"
             onClick={() => setFiltro(f.id)}
             className={cn(
-              "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-              filtro === f.id
-                ? "bg-slate-900 text-white"
-                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              "filter-pill",
+              filtro === f.id ? "filter-pill-active" : "filter-pill-inactive"
             )}
           >
             {f.label}
@@ -137,16 +154,16 @@ export function DashboardPrincipal() {
           variant="danger"
         />
         <MetricCard
-          title="Próximos Cobros"
-          value={metricas.proximos_cobros}
+          title={filtro === "todo" ? "Próximos Cobros" : "Próximos (período)"}
+          value={metricasFiltradas.proximos_cobros}
           icon={CalendarClock}
           format="number"
-          trend="Al día — esta semana"
+          trend="Al día — vencen en el período"
           variant="warning"
         />
         <MetricCard
-          title="Intereses Ganados"
-          value={metricas.intereses_ganados}
+          title={filtro === "todo" ? "Intereses Ganados" : "Intereses (período)"}
+          value={metricasFiltradas.intereses_ganados}
           icon={Percent}
           trend="Interés ya cobrado"
           variant="success"

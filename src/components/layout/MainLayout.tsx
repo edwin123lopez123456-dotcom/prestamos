@@ -31,7 +31,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   return (
     <AppContext.Provider value={{ searchQuery, setSearchQuery }}>
       <DataStoreProvider>
-        <div className="flex min-h-[100dvh] bg-slate-100">
+        <div className="flex min-h-[100dvh] page-gradient">
           <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <div className="flex flex-1 flex-col min-w-0">
             <TopBar
@@ -39,8 +39,8 @@ export function MainLayout({ children }: MainLayoutProps) {
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
             />
-            <main className="flex-1 overflow-y-auto pb-20 lg:pb-6 px-3 pt-3 sm:px-4 lg:px-6 lg:pt-6">
-              {children}
+            <main className="flex-1 overflow-y-auto pb-20 lg:pb-8 px-3 pt-4 sm:px-5 lg:px-8 lg:pt-8">
+              <div className="mx-auto w-full max-w-7xl">{children}</div>
             </main>
             <BottomNav />
           </div>

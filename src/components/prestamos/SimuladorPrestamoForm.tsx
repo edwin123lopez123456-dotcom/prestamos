@@ -110,7 +110,7 @@ export function SimuladorPrestamoForm({ clienteId }: SimuladorPrestamoFormProps)
       <BackButton href={`/clientes/${clienteId}`} label={cliente.nombre} />
 
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Nuevo crédito</h1>
+        <h1 className="page-heading">Nuevo crédito</h1>
         <p className="text-sm text-slate-500 mt-1">
           Simula y crea el plan de pagos antes de guardar
         </p>

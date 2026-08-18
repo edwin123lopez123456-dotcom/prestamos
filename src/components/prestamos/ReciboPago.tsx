@@ -11,6 +11,7 @@ import {
   formatDateTime,
   generarEnlaceWhatsApp,
   generarMensajeReciboWhatsApp,
+  telefonoValidoWhatsApp,
 } from "@/lib/utils";
 
 interface ReciboPagoProps {
@@ -60,10 +61,9 @@ export function ReciboPago({ data, onClose }: ReciboPagoProps) {
     nuevoSaldo: data.nuevo_saldo,
   });
 
-  const enlaceWhatsApp = generarEnlaceWhatsApp(
-    data.cliente_telefono,
-    mensajeWhatsApp
-  );
+  const enlaceWhatsApp = telefonoValidoWhatsApp(data.cliente_telefono)
+    ? generarEnlaceWhatsApp(data.cliente_telefono, mensajeWhatsApp)
+    : null;
 
   const nombreArchivo = `recibo-abono-${slugify(data.cliente_nombre) || "cliente"}`;
 
@@ -183,17 +183,19 @@ export function ReciboPago({ data, onClose }: ReciboPagoProps) {
           <Download className="h-4 w-4" />
           {descargando ? "Descargando..." : "Descargar Recibo"}
         </Button>
-        <Button
-          variant="outline"
-          className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-          asChild
-          disabled={descargando}
-        >
-          <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer">
-            <MessageCircle className="h-4 w-4" />
-            Compartir por WhatsApp
-          </a>
-        </Button>
+        {enlaceWhatsApp && (
+          <Button
+            variant="outline"
+            className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+            asChild
+            disabled={descargando}
+          >
+            <a href={enlaceWhatsApp} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="h-4 w-4" />
+              Compartir por WhatsApp
+            </a>
+          </Button>
+        )}
         {onClose && (
           <Button variant="ghost" onClick={onClose} disabled={descargando}>
             Cerrar

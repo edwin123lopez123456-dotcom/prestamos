@@ -2,6 +2,7 @@
 
 import { ClientesGrid } from "@/components/clientes/ClientesGrid";
 import { ClientesTable } from "@/components/clientes/ClientesTable";
+import { ClientesActionsPanel } from "@/components/clientes/ClientesActionsPanel";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { Button } from "@/components/ui/button";
 import { useDataStore } from "@/context/DataStoreContext";
@@ -31,31 +32,34 @@ export default function ClientesPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="page-heading">Clientes</h1>
+          <p className="page-subheading">
             Toca un cliente para ver su ficha completa
           </p>
         </div>
-        <div className="flex gap-1">
-          <Button
-            variant={vista === "grid" ? "default" : "outline"}
-            size="icon"
-            onClick={() => setVista("grid")}
-            aria-label="Vista tarjetas"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={vista === "tabla" ? "default" : "outline"}
-            size="icon"
-            onClick={() => setVista("tabla")}
-            aria-label="Vista tabla"
-          >
-            <List className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex gap-1 rounded-xl border border-slate-200/80 bg-white p-1 shadow-sm">
+            <Button
+              variant={vista === "grid" ? "default" : "outline"}
+              size="icon"
+              onClick={() => setVista("grid")}
+              aria-label="Vista tarjetas"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={vista === "tabla" ? "default" : "outline"}
+              size="icon"
+              onClick={() => setVista("tabla")}
+              aria-label="Vista tabla"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          {vista === "grid" && <ClientesActionsPanel />}
         </div>
       </div>
 

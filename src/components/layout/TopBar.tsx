@@ -39,7 +39,7 @@ export function TopBar({ onMenuClick, searchQuery, onSearchChange }: TopBarProps
     pathname.startsWith("/clientes/") && pathname !== "/clientes";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-900 text-white pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 text-white pt-[env(safe-area-inset-top)] shadow-lg shadow-slate-950/20">
       <div className="flex h-14 items-center gap-3 px-3 sm:px-4">
         <Button
           variant="ghost"
@@ -73,7 +73,7 @@ export function TopBar({ onMenuClick, searchQuery, onSearchChange }: TopBarProps
 
         <NotificacionesBell />
 
-        <div className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold shrink-0">
+        <div className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-700 text-sm font-bold shrink-0 shadow-md shadow-emerald-950/30">
           EI
         </div>
       </div>

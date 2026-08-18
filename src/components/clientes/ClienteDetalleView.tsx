@@ -8,6 +8,7 @@ import {
   Pencil,
   Trash2,
   UserX,
+  UserCheck,
   Plus,
   HandCoins,
 } from "lucide-react";
@@ -71,60 +72,92 @@ export function ClienteDetalleView({ clienteId }: ClienteDetalleViewProps) {
     router.push("/clientes");
   }
 
+  async function handleReactivar() {
+    if (!cliente) return;
+    await setClienteActivo(cliente.id, true);
+  }
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <BackButton href="/clientes" label="Clientes" />
 
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-slate-900">{cliente.nombre}</h1>
-            {!cliente.activo && (
-              <Badge variant="secondary" className="text-amber-700 bg-amber-50">
-                Inactivo
-              </Badge>
-            )}
-          </div>
-          <div className="mt-2 space-y-1 text-sm text-slate-600">
-            {cliente.telefono && (
-              <p className="flex items-center gap-2">
-                <Phone className="h-4 w-4" /> {cliente.telefono}
-              </p>
-            )}
-            {cliente.descripcion && (
-              <p className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" /> {cliente.descripcion}
-              </p>
-            )}
-            <p className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" /> Registro: {formatDate(cliente.fecha_registro)}
-            </p>
-          </div>
-        </div>
+      <Card className="overflow-hidden border-emerald-100/80 bg-gradient-to-br from-white via-white to-emerald-50/40">
+        <CardContent className="p-5 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex gap-4">
+              <div className="avatar-circle h-14 w-14 shrink-0 text-lg">
+                {cliente.nombre
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((p) => p[0]?.toUpperCase())
+                  .join("") || "?"}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="page-heading">{cliente.nombre}</h1>
+                  {!cliente.activo && (
+                    <Badge variant="secondary" className="text-amber-700 bg-amber-50">
+                      Inactivo
+                    </Badge>
+                  )}
+                </div>
+                <div className="mt-3 space-y-1.5 text-sm text-slate-600">
+                  {cliente.telefono && (
+                    <p className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-emerald-600" /> {cliente.telefono}
+                    </p>
+                  )}
+                  {cliente.descripcion && (
+                    <p className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-emerald-600" /> {cliente.descripcion}
+                    </p>
+                  )}
+                  <p className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-emerald-600" /> Registro:{" "}
+                    {formatDate(cliente.fecha_registro)}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" /> Editar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDesactivar}
-            disabled={mutating || !cliente.activo}
-          >
-            <UserX className="h-4 w-4" /> Desactivar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-red-600 border-red-200"
-            onClick={() => setDeleteOpen(true)}
-            disabled={clienteTienePrestamos(cliente.id)}
-          >
-            <Trash2 className="h-4 w-4" /> Eliminar
-          </Button>
-        </div>
-      </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                <Pencil className="h-4 w-4" /> Editar
+              </Button>
+              {cliente.activo !== false ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDesactivar}
+                  disabled={mutating}
+                >
+                  <UserX className="h-4 w-4" /> Desactivar
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleReactivar()}
+                  disabled={mutating}
+                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                >
+                  <UserCheck className="h-4 w-4" /> Reactivar
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => setDeleteOpen(true)}
+                disabled={clienteTienePrestamos(cliente.id)}
+              >
+                <Trash2 className="h-4 w-4" /> Eliminar
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-900">Créditos activos</h2>
@@ -144,7 +177,7 @@ export function ClienteDetalleView({ clienteId }: ClienteDetalleViewProps) {
             onClick={() =>
               router.push(`/clientes/${clienteId}/prestamos/${p.id}`)
             }
-            className="text-left rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-300 transition-colors"
+            className="text-left app-card app-card-interactive p-4"
           >
             <div className="flex items-start justify-between gap-2">
               <div>
